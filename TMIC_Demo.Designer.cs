@@ -133,21 +133,25 @@ namespace T.MIC_Demo_for_WIN
             // 
             // btnConnection
             // 
+            this.btnConnection.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(192)))));
             this.btnConnection.Location = new System.Drawing.Point(450, 17);
             this.btnConnection.Name = "btnConnection";
             this.btnConnection.Size = new System.Drawing.Size(120, 77);
             this.btnConnection.TabIndex = 1;
-            this.btnConnection.Text = "연결";
-            this.btnConnection.UseVisualStyleBackColor = true;
+            this.btnConnection.Text = "연결 안됨";
+            this.btnConnection.UseVisualStyleBackColor = false;
+            this.btnConnection.Click += new System.EventHandler(this.btnConnection_Click);
             // 
             // btnMute
             // 
+            this.btnMute.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(192)))));
             this.btnMute.Location = new System.Drawing.Point(576, 17);
             this.btnMute.Name = "btnMute";
             this.btnMute.Size = new System.Drawing.Size(120, 77);
             this.btnMute.TabIndex = 2;
-            this.btnMute.Text = "마이크 켜기";
-            this.btnMute.UseVisualStyleBackColor = true;
+            this.btnMute.Text = "마이크 꺼짐";
+            this.btnMute.UseVisualStyleBackColor = false;
+            this.btnMute.Click += new System.EventHandler(this.btnMute_Click);
             // 
             // listView1
             // 
@@ -170,6 +174,7 @@ namespace T.MIC_Demo_for_WIN
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Name = "TMIC_Demo";
             this.Text = "T.MIC Demo";
+            this.Load += new System.EventHandler(this.TMIC_Demo_Load);
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
             this.ResumeLayout(false);
