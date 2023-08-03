@@ -29,18 +29,20 @@ namespace T.MIC_Demo_for_WIN
         /// </summary>
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
-            this.label1 = new System.Windows.Forms.Label();
-            this.label2 = new System.Windows.Forms.Label();
-            this.tbIPAddress = new System.Windows.Forms.TextBox();
-            this.tbPortNumber = new System.Windows.Forms.TextBox();
-            this.label3 = new System.Windows.Forms.Label();
-            this.label4 = new System.Windows.Forms.Label();
-            this.cbProtocol = new System.Windows.Forms.ComboBox();
             this.cbMICList = new System.Windows.Forms.ComboBox();
+            this.cbProtocol = new System.Windows.Forms.ComboBox();
+            this.label4 = new System.Windows.Forms.Label();
+            this.label3 = new System.Windows.Forms.Label();
+            this.tbPortNumber = new System.Windows.Forms.TextBox();
+            this.tbIPAddress = new System.Windows.Forms.TextBox();
+            this.label2 = new System.Windows.Forms.Label();
+            this.label1 = new System.Windows.Forms.Label();
             this.btnConnection = new System.Windows.Forms.Button();
             this.btnMute = new System.Windows.Forms.Button();
-            this.listView1 = new System.Windows.Forms.ListView();
+            this.lvTextlist = new System.Windows.Forms.ListView();
+            this.statusMngTimer = new System.Windows.Forms.Timer(this.components);
             this.groupBox1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -61,46 +63,26 @@ namespace T.MIC_Demo_for_WIN
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "접속정보 및 마이크 정보";
             // 
-            // label1
+            // cbMICList
             // 
-            this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(6, 26);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(44, 12);
-            this.label1.TabIndex = 0;
-            this.label1.Text = "IP 주소";
+            this.cbMICList.FormattingEnabled = true;
+            this.cbMICList.Items.AddRange(new object[] {
+            "선택해주세요"});
+            this.cbMICList.Location = new System.Drawing.Point(281, 47);
+            this.cbMICList.Name = "cbMICList";
+            this.cbMICList.Size = new System.Drawing.Size(139, 20);
+            this.cbMICList.TabIndex = 7;
             // 
-            // label2
+            // cbProtocol
             // 
-            this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(6, 53);
-            this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(55, 12);
-            this.label2.TabIndex = 1;
-            this.label2.Text = "Port 번호";
-            // 
-            // tbIPAddress
-            // 
-            this.tbIPAddress.Location = new System.Drawing.Point(71, 20);
-            this.tbIPAddress.Name = "tbIPAddress";
-            this.tbIPAddress.Size = new System.Drawing.Size(128, 21);
-            this.tbIPAddress.TabIndex = 2;
-            // 
-            // tbPortNumber
-            // 
-            this.tbPortNumber.Location = new System.Drawing.Point(71, 47);
-            this.tbPortNumber.Name = "tbPortNumber";
-            this.tbPortNumber.Size = new System.Drawing.Size(128, 21);
-            this.tbPortNumber.TabIndex = 3;
-            // 
-            // label3
-            // 
-            this.label3.AutoSize = true;
-            this.label3.Location = new System.Drawing.Point(214, 26);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(51, 12);
-            this.label3.TabIndex = 4;
-            this.label3.Text = "Protocol";
+            this.cbProtocol.FormattingEnabled = true;
+            this.cbProtocol.Items.AddRange(new object[] {
+            "TCP/IP",
+            "UDP"});
+            this.cbProtocol.Location = new System.Drawing.Point(281, 21);
+            this.cbProtocol.Name = "cbProtocol";
+            this.cbProtocol.Size = new System.Drawing.Size(139, 20);
+            this.cbProtocol.TabIndex = 6;
             // 
             // label4
             // 
@@ -111,34 +93,55 @@ namespace T.MIC_Demo_for_WIN
             this.label4.TabIndex = 5;
             this.label4.Text = "사용 MIC";
             // 
-            // cbProtocol
+            // label3
             // 
-            this.cbProtocol.FormattingEnabled = true;
-            this.cbProtocol.Items.AddRange(new object[] {
-            "선택하세요",
-            "TCP/IP",
-            "UDP"});
-            this.cbProtocol.Location = new System.Drawing.Point(281, 21);
-            this.cbProtocol.Name = "cbProtocol";
-            this.cbProtocol.Size = new System.Drawing.Size(139, 20);
-            this.cbProtocol.TabIndex = 6;
+            this.label3.AutoSize = true;
+            this.label3.Location = new System.Drawing.Point(214, 26);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(51, 12);
+            this.label3.TabIndex = 4;
+            this.label3.Text = "Protocol";
             // 
-            // cbMICList
+            // tbPortNumber
             // 
-            this.cbMICList.FormattingEnabled = true;
-            this.cbMICList.Location = new System.Drawing.Point(281, 47);
-            this.cbMICList.Name = "cbMICList";
-            this.cbMICList.Size = new System.Drawing.Size(139, 20);
-            this.cbMICList.TabIndex = 7;
+            this.tbPortNumber.Location = new System.Drawing.Point(71, 47);
+            this.tbPortNumber.Name = "tbPortNumber";
+            this.tbPortNumber.Size = new System.Drawing.Size(128, 21);
+            this.tbPortNumber.TabIndex = 3;
+            // 
+            // tbIPAddress
+            // 
+            this.tbIPAddress.Location = new System.Drawing.Point(71, 20);
+            this.tbIPAddress.Name = "tbIPAddress";
+            this.tbIPAddress.Size = new System.Drawing.Size(128, 21);
+            this.tbIPAddress.TabIndex = 2;
+            // 
+            // label2
+            // 
+            this.label2.AutoSize = true;
+            this.label2.Location = new System.Drawing.Point(6, 53);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(55, 12);
+            this.label2.TabIndex = 1;
+            this.label2.Text = "Port 번호";
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Location = new System.Drawing.Point(6, 26);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(44, 12);
+            this.label1.TabIndex = 0;
+            this.label1.Text = "IP 주소";
             // 
             // btnConnection
             // 
-            this.btnConnection.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(192)))));
+            this.btnConnection.BackColor = System.Drawing.SystemColors.Control;
             this.btnConnection.Location = new System.Drawing.Point(450, 17);
             this.btnConnection.Name = "btnConnection";
             this.btnConnection.Size = new System.Drawing.Size(120, 77);
             this.btnConnection.TabIndex = 1;
-            this.btnConnection.Text = "연결 안됨";
+            this.btnConnection.Text = "연결 요청";
             this.btnConnection.UseVisualStyleBackColor = false;
             this.btnConnection.Click += new System.EventHandler(this.btnConnection_Click);
             // 
@@ -153,21 +156,27 @@ namespace T.MIC_Demo_for_WIN
             this.btnMute.UseVisualStyleBackColor = false;
             this.btnMute.Click += new System.EventHandler(this.btnMute_Click);
             // 
-            // listView1
+            // lvTextlist
             // 
-            this.listView1.HideSelection = false;
-            this.listView1.Location = new System.Drawing.Point(12, 100);
-            this.listView1.Name = "listView1";
-            this.listView1.Size = new System.Drawing.Size(684, 334);
-            this.listView1.TabIndex = 3;
-            this.listView1.UseCompatibleStateImageBehavior = false;
+            this.lvTextlist.HideSelection = false;
+            this.lvTextlist.Location = new System.Drawing.Point(12, 100);
+            this.lvTextlist.Name = "lvTextlist";
+            this.lvTextlist.Size = new System.Drawing.Size(684, 334);
+            this.lvTextlist.TabIndex = 3;
+            this.lvTextlist.UseCompatibleStateImageBehavior = false;
+            // 
+            // statusMngTimer
+            // 
+            this.statusMngTimer.Enabled = true;
+            this.statusMngTimer.Interval = 1000;
+            this.statusMngTimer.Tick += new System.EventHandler(this.statusMngTimer_Tick);
             // 
             // TMIC_Demo
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(706, 449);
-            this.Controls.Add(this.listView1);
+            this.Controls.Add(this.lvTextlist);
             this.Controls.Add(this.btnMute);
             this.Controls.Add(this.btnConnection);
             this.Controls.Add(this.groupBox1);
@@ -194,7 +203,8 @@ namespace T.MIC_Demo_for_WIN
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Button btnConnection;
         private System.Windows.Forms.Button btnMute;
-        private System.Windows.Forms.ListView listView1;
+        private System.Windows.Forms.ListView lvTextlist;
+        private System.Windows.Forms.Timer statusMngTimer;
     }
 }
 
