@@ -14,6 +14,7 @@ using System.Net.NetworkInformation;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using Newtonsoft.Json.Linq;
+using System.IO;
 
 namespace T.MIC_Demo_for_WIN
 {
@@ -28,12 +29,18 @@ namespace T.MIC_Demo_for_WIN
         bool IsMute = true;
 
         string ipAddress;
-        decimal portNumber;
+        int portNumber;
         string protocol;
+
+        // Transfer Sequence
+        int seq = -1;
+        Int16 dataSeq;
 
         // for MIC Device
         public MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
         public MMDevice micDevice;
+
+        Dictionary<string, int> micDict = new Dictionary<string, int>();
 
         // for Voice Processing
         private WasapiCapture capture;
@@ -41,19 +48,30 @@ namespace T.MIC_Demo_for_WIN
         WaveFormat waveFormat;
         public byte[] micByte = new byte[0];
 
+        private WaveInEvent waveIn;
+        string outputFolder;
+        string outputFilePath;
+
         // for Network
         IPEndPoint endPoint;
+        System.Threading.Timer asyncTimer;
+        public const byte SESSION_CONTROL = 0x01;
+        public const byte SESSION_TRANSCRIBE = 0x02;
         // 1. UDP
         private static UdpClient udpCli;
         private Thread thrUDPSender;
         // 2. TCP/IP
         private static TcpClient tcpCli;
+        public const int TCP_PACKET_SIZE = 2048;
+        Thread tcpConnThread;
+        Thread tcpReceiveThread;
         #endregion
 
         public TMIC_Demo()
         {
             InitializeComponent();
-            initCaptureVoice();
+            // TCP/IP
+            //initTaskThread();
         }
 
         #region Property
@@ -61,24 +79,41 @@ namespace T.MIC_Demo_for_WIN
         {
             // Combobox Init
             cbProtocol.SelectedIndex = 0;
-            tbIPAddress.Invoke(new MethodInvoker(delegate { tbIPAddress.Text = "192.168.50.100"; }));
-            tbPortNumber.Invoke(new MethodInvoker(delegate { tbPortNumber.Text = "50011"; }));
+            tbIPAddress.Invoke(new MethodInvoker(delegate { tbIPAddress.Text = "211.201.11.12"; }));
+            mtbPortNumber.Invoke(new MethodInvoker(delegate { mtbPortNumber.Text = "50030"; }));
+
+            btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.BackColor = Color.LightPink; }));
+            btnMute.Invoke(new MethodInvoker(delegate { btnMute.BackColor = Color.LightPink; }));
 
             // 사용 가능한 마이크 Loading 및 기본값 설정
             SelectMICList();
             if (cbMICList.Items.Count > 0)
                 cbMICList.SelectedIndex = 0;
 
+            outputFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "NAudio");
+            Directory.CreateDirectory(outputFolder);
+            outputFilePath = Path.Combine(outputFolder, "recorded.wav");
+
             // Socket Thread
-            tcpCli = new TcpClient();
-            Thread tcpReceiveThread = new Thread(new ThreadStart(tcpReceive));
-            tcpReceiveThread.IsBackground = true;
-            tcpReceiveThread.Start();
+            //tcpCli = new TcpClient();
+            //Thread tcpReceiveThread = new Thread(new ThreadStart(tcpReceive));
+            //tcpReceiveThread.IsBackground = true;
+            //tcpReceiveThread.Start();
 
             //udpCli = new UdpClient();
             //Thread udpSenderThread = new Thread(new ThreadStart(udpSender));
             //udpSenderThread.Start();
         }
+
+        private void tbIPAddress_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            // 입력된 키가 숫자나 점(.)이 아니면 입력을 막습니다.
+            if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar != '.')
+            {
+                e.Handled = true;
+            }
+        }
+
         #endregion
 
         #region ButtonEvent
@@ -86,79 +121,162 @@ namespace T.MIC_Demo_for_WIN
         {
             if (IsConnected == false)
             {
-                if (tbIPAddress.Text == "" || tbPortNumber.Text == "" || cbMICList.Text == "")
+                if (tbIPAddress.Text == "" || mtbPortNumber.Text == "" || cbMICList.Text == "")
                 {
                     Console.WriteLine("IP 또는 PORT, 마이크 정보가 입력되지 않았습니다.");
+                    lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Add("IP 또는 PORT, 마이크 정보가 입력되지 않았습니다."); }));
+                    lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
                     return;
                 }
 
-                btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.Text = "연결시도"; }));
                 ipAddress = tbIPAddress.Text;
-                portNumber = Convert.ToInt32(tbPortNumber.Text);
+                portNumber = int.Parse(mtbPortNumber.Text);
                 protocol = cbProtocol.Text;
 
                 if (ipAddress.Split('.').Length != 4 || portNumber < 0)
                 {
                     Console.WriteLine("IP 또는 PORT 정보가 잘못 되었습니다. [{0}-{1}]", ipAddress, portNumber);
+                    lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Add("IP 또는 PORT 정보가 잘못 되었습니다. [" + ipAddress + "]-[" + portNumber + "]"); }));
+                    lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
                     return;
                 }
 
                 if (cbProtocol.Text == "UDP")
                 {
                     Console.WriteLine("UDP 프로토콜은 업데이트 예정입니다.");
+                    MessageBox.Show("UDP 프로토콜은 업데이트 예정입니다.", "안내", MessageBoxButtons.OK, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1, MessageBoxOptions.DefaultDesktopOnly);
+               
                     return;
                 }
 
                 Console.WriteLine("[{0}:{1}-{2}] 연결 요청", ipAddress, portNumber, protocol);
+                lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Add("[" + ipAddress + ":" + portNumber + "-" + protocol + "] 연결 요청"); }));
+                lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
+
+                btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.Text = "연결시도"; }));
 
                 if (cbProtocol.Text == "TCP/IP")
                 {
-                    Thread tcpConnThread = new Thread(new ThreadStart(tcpConnect));
+                    tcpCli = new TcpClient();
+
+                    tcpConnThread = new Thread(new ThreadStart(tcpConnect));
                     tcpConnThread.IsBackground = true;
                     tcpConnThread.Start();
                 } 
-                else
+                else // UDP
                 {
 
                 }
+                Delay(2000);
 
-                // [SessionControl]
-                // {
-                //     "MsgType" : "ConnectModel",
-                //     "MsgData" :
-                //     {
-                //         "ModelName" : "WHISPER-Large"
-                //     }
-                // }
+                if (IsConnected == true)
+                {
+                    tcpReceiveThread = new Thread(new ThreadStart(tcpReceive));
+                    tcpReceiveThread.IsBackground = true;
+                    tcpReceiveThread.Start();
 
+                    // make TCP/IP Send Message
+                    // [SessionControl]
+                    // {
+                    //     "MsgType" : "ConnectModel",
+                    //     "MsgData" :
+                    //     {
+                    //         "ModelName" : "WHISPER"
+                    //     }
+                    // }
+                    // TCP/IP Body
+                    string sndMsg = reqSessionControl("WHISPER");
+                    if (sndMsg.Length <= 0)
+                    {
+                        Console.WriteLine("reqSessionControl():: 메시지 생성 실패");
+                        lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Add("reqSessionControl():: 메시지 생성 실패"); }));
+                        lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
+                        return;
+                    }
+                    Console.WriteLine("sndMsg({0}) : {1}", sndMsg.Length, sndMsg);
+                    lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Add("sndMsg(" + sndMsg.Length + ") : " + sndMsg); }));
+                    lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
+                    // TCP/IP Header
+                    byte[] version = { 0x00 };
+                    byte[] msgcode = { 0x01 }; // 0x01 : SessionControl, 0x02 : SessionTranscribe
+                    seq = seq + 1;
+                    Byte[] header = makeTcpHeader(version, msgcode, seq, sndMsg.Length);
 
-                string sndMsg = reqSessionControl("WHISPER-Large");
-                Console.WriteLine("sndMsg : {0}", sndMsg);
-
-                             
-
-                //capture.StartRecording();
-                //
-                //writer = new WaveFileWriter("recorded.wav", capture.WaveFormat);
-                //
-                //try
-                //{
-                //    while(true)
-                //    {
-                //        if(micByte.Length > 2048)
-                //        {
-                //            Console.WriteLine("{0}", micByte.ToString());
-                //        }
-                //    }
-                //}
-                //catch (Exception ex)
-                //{
-                //
-                //}
+                    // TCP/IP Message Send
+                    try
+                    {
+                        if(tcpCli.Connected)
+                        {
+                            NetworkStream tcpStream = tcpCli.GetStream();
+                            // send Header (byte)
+                            tcpStream.Write(header, 0, header.Length);
+                            // send Body (String - json)
+                            byte[] bodyBuf = Encoding.UTF8.GetBytes(sndMsg);
+                            tcpStream.Write(bodyBuf, 0, bodyBuf.Length);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.ToString());
+                    }
+                    // ------------------------------------------------------------------  
+                }
             }
             else // IsConnected = true
             {
+                lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Add("TCP 연결 해제"); }));
+                lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
+
+                IsConnected = false;
+                seq = -1;
                 btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.Text = "연결요청"; }));
+                btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.BackColor = Color.LightPink; }));
+                btnMute.Invoke(new MethodInvoker(delegate { btnMute.Text = "마이크 꺼짐"; }));
+                btnMute.Invoke(new MethodInvoker(delegate { btnMute.BackColor = Color.LightPink; }));
+                tbIPAddress.Invoke(new MethodInvoker(delegate { tbIPAddress.ReadOnly = false; }));
+                mtbPortNumber.Invoke(new MethodInvoker(delegate { mtbPortNumber.ReadOnly = false; }));
+                cbMICList.Invoke(new MethodInvoker(delegate { cbMICList.Enabled = true; }));
+                cbProtocol.Invoke(new MethodInvoker(delegate { cbProtocol.Enabled = true; }));
+                lbLog.Items.Clear();
+                lbSttText.Items.Clear();
+
+                //asyncTimer.Change(0, System.Threading.Timeout.Infinite);
+                if (writer != null)
+                {
+                    writer?.Dispose();
+                    writer = null;
+                }
+                
+                if (waveIn != null)
+                {
+                    waveIn.StopRecording();
+                    waveIn.Dispose();
+                }
+
+                bool flag = false;
+                cbProtocol.Invoke(new MethodInvoker(delegate { flag = cbProtocol.Text == "TCP/IP" ? true : false; }));
+                if (flag) // TCP/IP
+                {
+                    if(tcpConnThread != null)
+                    {
+                        tcpConnThread.Interrupt();
+                        //tcpConnThread = null;
+                    }
+                    if(tcpReceiveThread != null)
+                    {
+                        tcpReceiveThread.Interrupt();
+                        //tcpReceiveThread = null;
+                    }
+                    if(tcpCli != null)
+                    {
+                        tcpCli.Close();
+                        //tcpCli = null;
+                    }
+                }
+                else // UDP
+                {
+
+                }
             }
         }
 
@@ -166,56 +284,155 @@ namespace T.MIC_Demo_for_WIN
         {
             if (IsConnected == false)
             {
-                Console.WriteLine("마이크가 연결되지 않았습니다.");
+                Console.WriteLine("네트워크가 연결되지 않았습니다.");
+                lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Add("네트워크가 연결되지 않았습니다."); }));
+                lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
             }
             else // IsConnected = true
             {
-
+                Console.WriteLine("마이크 ON/OFF 기능은 아직 지원하지 않습니다.");
+                MessageBox.Show("마이크 ON/OFF 기능은 아직 지원하지 않습니다.", "안내", MessageBoxButtons.OK, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1, MessageBoxOptions.DefaultDesktopOnly);
             }
         }
         #endregion
 
         #region Network
+        private byte[] makeTcpHeader(byte[] ver, byte[] msgCode, int seq, int length)
+        {
+            Int16 Seq = Convert.ToInt16(seq);
+            byte[] sequence = BitConverter.GetBytes(Seq);
+            byte[] payloadlength = BitConverter.GetBytes(length);
+
+            Byte[] result = ver.Concat(msgCode).Concat(sequence).Concat(payloadlength).ToArray();
+
+            return result;
+        }
+
         private void tcpConnect()
         {
-            IPEndPoint endPoint = new IPEndPoint(IPAddress.Parse(ipAddress), int.Parse(portNumber.ToString()));
+            IPEndPoint endPoint = new IPEndPoint(IPAddress.Parse(ipAddress), portNumber);
             try
             {
+                if (tcpCli == null)
+                    tcpCli = new TcpClient();
                 tcpCli.Connect(endPoint);
                 Console.WriteLine("[tcpConnect() :: 연결 요청 완료");
+                lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Add("[tcpConnect() :: 연결 요청 완료"); }));
+                lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
             }
             catch (SocketException se)
             {
                 Console.WriteLine("[tcpConnect() :: {0}", se.Message);
+                lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Add("[tcpConnect() :: " + se.Message); }));
+                lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
+                btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.Text = "연결 요청"; }));
             }
+        }
+
+        static public string ToReadableByteArray(byte[] bytes)
+        {
+            return string.Join(", ", bytes);
         }
 
         private void tcpReceive()
         {
-            while (true)
+            while (tcpCli.Connected)
             {
-                if(IsConnected == true)
+                try
                 {
-                    try
+                    NetworkStream stream = tcpCli.GetStream();
+
+                    byte[] rBuffer = new byte[2048];
+                    int bytes = stream.Read(rBuffer, 0, rBuffer.Length);
+                    if (bytes <= 0)
+                        continue;
+                    string message = Encoding.UTF8.GetString(rBuffer, 0, bytes);
+
+                    Console.WriteLine("[TCP Recv]\n {0}", message);
+
+                    // 1. GET Header
+                    //byte[] buffer = new byte[8];
+                    //int bytes = stream.Read(buffer, 0, buffer.Length);
+                    //if (bytes <= 0)
+                    //    continue;
+
+                    byte[] buffer = new byte[8];
+                    Array.Copy(rBuffer, buffer, buffer.Length);
+                    Console.WriteLine(BitConverter.ToString(buffer));
+
+                    // 1-1. version (1byte)
+                    byte[] tmpVersion = new byte[1];
+                    Buffer.BlockCopy(buffer, 0, tmpVersion, 0, 1);
+                    string Version = BitConverter.ToString(tmpVersion);
+                    Console.WriteLine("Version : {0}", Version);
+                    // 1-2. MsgCode (1byte)
+                    byte[] tmpMsgCode = new byte[1];
+                    Buffer.BlockCopy(buffer, 1, tmpMsgCode, 0, 1);
+                    string MsgCode = BitConverter.ToString(tmpMsgCode);
+                    Console.WriteLine("MsgCode {0}", MsgCode);
+                    // 1-3. Sequence (2byte)
+                    byte[] tmpSeq = new byte[2];
+                    Buffer.BlockCopy(buffer, 2, tmpSeq, 0, 2);
+                    short Sequence = BitConverter.ToInt16(tmpSeq, 0);
+                    Console.WriteLine("Sequence : {0}", Sequence);
+                    // 1-4. PayloadLength (4byte)
+                    byte[] tmpLength = new byte[4];
+                    Buffer.BlockCopy(buffer, 4, tmpLength, 0, 4);
+                    int PayloadLength = BitConverter.ToInt32(tmpLength, 0);
+                    Console.WriteLine("PayloadLength : {0}", PayloadLength);
+
+                    // 2. GET Body
+                    buffer = new byte[PayloadLength];
+                    //bytes = stream.Read(buffer, 0, buffer.Length);
+                    //if (bytes <= 0)
+                    //    continue;
+                    Array.Copy(rBuffer, 8, buffer, 0, buffer.Length);
+                    message = Encoding.UTF8.GetString(buffer, 0, PayloadLength);
+                    Console.WriteLine("[TCP Recv - Body]\n {0}", message);
+                    lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Add("rcvMsg(" + PayloadLength + ") : " + message); }));
+                    lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
+
+                    if (MsgCode.Equals("01"))
                     {
-                        NetworkStream stream = tcpCli.GetStream();
-                        byte[] buffer = new byte[1024];
-                        int bytes = stream.Read(buffer, 0, buffer.Length);
-                        if (bytes <= 0)
-                            continue;
-                        string message = Encoding.UTF8.GetString(buffer, 0, bytes);
-                        Console.WriteLine("[TCP Recv] {0}", message);
+                        Console.WriteLine("SessionControl");
 
                         //1. [SessionControl]
                         //{
                         //    "result" : "0",
                         //    "readon" : "SUCCESS"
                         //}
-                        //string result = resSessionControl(message);
-                        //if (result.equals("0"))
-                        //{
-                        //    tcpSender();
-                        //}
+                        string result = resSessionControl(message);
+                        if (result.Equals("0"))
+                        {
+                            lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Add("STT Model 연결 완료!!"); }));
+                            lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
+                            btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.Text = "연결됨"; }));
+                            btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.BackColor = Color.LightGreen; }));
+                            btnMute.Invoke(new MethodInvoker(delegate { btnMute.Text = "마이크 켜짐"; }));
+                            btnMute.Invoke(new MethodInvoker(delegate { btnMute.BackColor = Color.LightGreen; }));
+
+                            tbIPAddress.Invoke(new MethodInvoker(delegate { tbIPAddress.ReadOnly = true; }));
+                            mtbPortNumber.Invoke(new MethodInvoker(delegate { mtbPortNumber.ReadOnly = true; }));
+                            cbMICList.Invoke(new MethodInvoker(delegate { cbMICList.Enabled = false; }));
+                            cbProtocol.Invoke(new MethodInvoker(delegate { cbProtocol.Enabled = false; }));
+
+                            // Voice from MIC Device Capture Start
+                            //asyncTimer.Change(0, 50);
+                            initWaveIn();
+                            waveIn.StartRecording();
+                            writer = new WaveFileWriter(outputFilePath, waveIn.WaveFormat);
+                        }
+                        else // Error Code
+                        {
+                            if (result.Equals("1000"))
+                            {
+                                Console.WriteLine("[TCP Recv Error] {0})", result);
+                            }
+                        }
+                    }
+                    else if (MsgCode.Equals("02"))
+                    {
+                        Console.WriteLine("SessionTranscribe");
 
                         //2. [StreamTranscribe]
                         //{
@@ -224,11 +441,67 @@ namespace T.MIC_Demo_for_WIN
                         //    "txt" : "안녕하세요",
                         //    "vol" : "1049"
                         //}
-                        //jsonStreamTranscribe(message);
+                        string result = jsonStreamTranscribe(message);
+                        lbSttText.Invoke(new MethodInvoker(delegate { lbSttText.Items.Add(result); }));
+                        lbSttText.Invoke(new MethodInvoker(delegate { lbSttText.SelectedIndex = lbSttText.Items.Count - 1; }));
                     }
-                    catch (Exception ex)
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("[tcpReceive():: {0}", ex.ToString());
+                    // 종료시 내용 추가                    
+                    lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Add("TCP 연결 해제"); }));
+                    lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
+
+                    IsConnected = false;
+                    seq = -1;
+                    btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.Text = "연결요청"; }));
+                    btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.BackColor = Color.LightPink; }));
+                    btnMute.Invoke(new MethodInvoker(delegate { btnMute.Text = "마이크 꺼짐"; }));
+                    btnMute.Invoke(new MethodInvoker(delegate { btnMute.BackColor = Color.LightPink; }));
+                    tbIPAddress.Invoke(new MethodInvoker(delegate { tbIPAddress.ReadOnly = false; }));
+                    mtbPortNumber.Invoke(new MethodInvoker(delegate { mtbPortNumber.ReadOnly = false; }));
+                    cbMICList.Invoke(new MethodInvoker(delegate { cbMICList.Enabled = true; }));
+                    cbProtocol.Invoke(new MethodInvoker(delegate { cbProtocol.Enabled = true; }));
+                    lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Clear(); }));
+                    lbSttText.Invoke(new MethodInvoker(delegate { lbSttText.Items.Clear(); }));
+
+                    //asyncTimer.Change(0, System.Threading.Timeout.Infinite);
+                    if (writer != null)
                     {
-                        Console.WriteLine("[tcpReceive():: {0}", ex.ToString());
+                        writer?.Dispose();
+                        writer = null;
+                    }
+
+                    if (waveIn != null)
+                    {
+                        waveIn.StopRecording();
+                        waveIn.Dispose();
+                    }
+
+                    bool flag = false;
+                    cbProtocol.Invoke(new MethodInvoker(delegate { flag = cbProtocol.Text == "TCP/IP" ? true : false; }));
+                    if (flag) // TCP/IP
+                    {
+                        if(tcpConnThread != null)
+                        {
+                            tcpConnThread.Interrupt();
+                            tcpConnThread = null;
+                        }
+                        if(tcpReceiveThread != null)
+                        {
+                            tcpReceiveThread.Interrupt();
+                            tcpReceiveThread = null;
+                        }
+                        if(tcpCli != null)
+                        {
+                            tcpCli.Close();
+                            //tcpCli = null;
+                        }
+                    }
+                    else // UDP
+                    {
+
                     }
                 }
             }
@@ -236,31 +509,74 @@ namespace T.MIC_Demo_for_WIN
 
         private void udpSender()
         {
-            try
-            {
-                while (true)
-                {
-                    if (micByte.Length > 172)
-                    {
-                        byte[] datagram = new byte[172];
-                        Array.Copy(micByte, 0, datagram, 0, 172);
-                        micByte = splitByteArry(micByte, 172, micByte.Length - 172);
-                        //Console.WriteLine("micBdatagramyte.Length : " + datagram.Length);
-                        if (datagram.Length >= 172)
-                        {
-                            udpCli.Send(datagram, datagram.Length, "211.201.11.12", 50011);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("UDP_Sender():: " + ex.ToString());
-            }
+            //try
+            //{
+            //    while (true)
+            //    {
+            //        if (micByte.Length > 172)
+            //        {
+            //            byte[] datagram = new byte[172];
+            //            Array.Copy(micByte, 0, datagram, 0, 172);
+            //            micByte = splitByteArray(micByte, 172, micByte.Length - 172);
+            //            //Console.WriteLine("micBdatagramyte.Length : " + datagram.Length);
+            //            if (datagram.Length >= 172)
+            //            {
+            //                udpCli.Send(datagram, datagram.Length, "211.201.11.12", 50011);
+            //            }
+            //        }
+            //    }
+            //}
+            //catch (Exception ex)
+            //{
+            //    Console.WriteLine("UDP_Sender():: " + ex.ToString());
+            //}
         }
         #endregion
 
         #region Inner Function
+        //public void initTaskThread()
+        //{
+        //    asyncTimer = new System.Threading.Timer(asyncRun, "tcpAsync", 0, System.Threading.Timeout.Infinite);
+        //}
+        //
+        //public async void asyncRun(object obj)
+        //{
+        //    var objTask = Task.Run(() => SendTcpSocketAsync());
+        //    await objTask;
+        //}
+        //
+        //private void SendTcpSocketAsync()
+        //{
+        //    try
+        //    {
+        //        if(IsConnected == true)
+        //        {
+        //            if (micByte.Length == 3200)
+        //            {
+        //                NetworkStream tcpStream = tcpCli.GetStream();
+        //                //byte[] sendBuf = new byte[2048];
+        //                //Array.Copy(micByte, 0, sendBuf, 0, 2048);
+        //                //micByte = splitByteArray(micByte, 2048, micByte.Length - 2048);
+        //
+        //                // TCP/IP Header
+        //                byte[] version = { 0x00 };
+        //                byte[] msgcode = { 0x02 }; // 0x01 : SessionControl, 0x02 : SessionTranscribe
+        //                seq = seq + 1;
+        //                Byte[] header = makeTcpHeader(version, msgcode, seq, micByte.Length);
+        //                //Console.WriteLine("seq : {0}, micByte.Length : {1}", seq, micByte.Length);
+        //                
+        //                tcpStream.Write(header, 0, header.Length);
+        //                // TCP/IP Body
+        //                tcpStream.Write(micByte, 0, micByte.Length);
+        //            }
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.WriteLine(ex.ToString());
+        //    }
+        //}
+
         private void SelectMICList()
         {
             try
@@ -270,6 +586,13 @@ namespace T.MIC_Demo_for_WIN
                 {
                     cbMICList.Items.Add(device.FriendlyName);
                 }
+
+                for (int i = -1; i < NAudio.Wave.WaveIn.DeviceCount; i++)
+                {
+                    var device = NAudio.Wave.WaveIn.GetCapabilities(i);
+                    Console.WriteLine($"{i}: {device.ProductName}");
+                    micDict.Add(device.ProductName, i);
+                }
             }
             catch (Exception e)
             {
@@ -277,82 +600,78 @@ namespace T.MIC_Demo_for_WIN
             }
         }
 
-        public byte[] CombineByteArray(byte[] first, byte[] second)
+        private void DataAvailable(object sender, NAudio.Wave.WaveInEventArgs a)
         {
+            //Console.WriteLine("{0}-{1}", a.Buffer.Length, a.BytesRecorded);
+            if(writer != null)
+            {
+                writer.Write(a.Buffer, 0, a.BytesRecorded);
+
+                if(tcpCli.Connected)
+                {
+                    NetworkStream tcpStream = tcpCli.GetStream();
+
+                    // TCP/IP Header
+                    byte[] version = { 0x00 };
+                    byte[] msgcode = { 0x02 }; // 0x01 : SessionControl, 0x02 : SessionTranscribe
+                    seq = seq + 1;
+                    Byte[] header = makeTcpHeader(version, msgcode, seq, a.BytesRecorded);
+                    //Console.WriteLine("seq : {0}, micByte.Length : {1}", seq, micByte.Length);
+
+                    tcpStream.Write(header, 0, header.Length);
+                    // TCP/IP Body
+                    tcpStream.Write(a.Buffer, 0, a.BytesRecorded);
+                }
+            }
+            //micByte = new byte[a.BytesRecorded];
+            //Array.Copy(a.Buffer, 0, micByte, 0, a.BytesRecorded);
+        }
+
+        private void initWaveIn()
+        {
+            cbMICList.Invoke(new MethodInvoker(delegate { Console.WriteLine("사용할 마이크 : {0}({1})", cbMICList.Text, micDict[cbMICList.Text]); }));
             try
             {
-                byte[] result = new byte[first.Length + second.Length];
-                Array.Copy(first, 0, result, 0, first.Length);
-                Array.Copy(second, 0, result, 0, second.Length);
-                return result;
+                int deviceNumber = -1;
+                cbMICList.Invoke(new MethodInvoker(delegate { deviceNumber = micDict[cbMICList.Text]; }));
+
+                waveIn = new WaveInEvent
+                {
+                    DeviceNumber = deviceNumber,
+                    WaveFormat = new WaveFormat(rate: 16000, bits: 16, channels: 1)                    
+                };
+                waveIn.DataAvailable += DataAvailable;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("CombineByteArray() ::" + ex.ToString());
-                return null;
+                Console.WriteLine("[initWaveIn():: {0}", ex.ToString());
             }
         }
 
-        private void Capture_DataAvailable(object sender, NAudio.Wave.WaveInEventArgs e)
+        private void Delay(int ms)
         {
-            try
+            DateTime dateTimeNow = DateTime.Now;
+            TimeSpan duration = new TimeSpan(0, 0, 0, 0, ms);
+            DateTime dateTimeAdd = dateTimeNow.Add(duration);
+            while (dateTimeAdd >= dateTimeNow)
             {
-                byte[] bytes = new byte[e.BytesRecorded];
-                Array.Copy(e.Buffer, 0, bytes, 0, e.BytesRecorded);
-
-                micByte = CombineByteArray(micByte, bytes);
-                writer.Write(e.Buffer, 0, e.BytesRecorded);
+                System.Windows.Forms.Application.DoEvents();
+                dateTimeNow = DateTime.Now;
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Capture_DataAvailable():: " + ex.ToString());
-            }
-        }
-
-        private void initCaptureVoice()
-        {
-            try
-            {
-                micDevice = deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
-                capture = new WasapiCapture(micDevice);
-                capture.DataAvailable += Capture_DataAvailable;
-                waveFormat = new WaveFormat(16000, 16, 1); // rate, bits, channels
-                capture.WaveFormat = waveFormat;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("[initCaptureVoice():: {0}", ex.ToString());
-            }
-        }
-
-        public byte[] splitByteArry(byte[] array, int startIndex, int length)
-        {
-            try
-            {
-                byte[] result = new byte[length];
-                Array.Copy(array, startIndex, result, 0, length);
-                return result;
-            }
-            catch
-            {
-                return null;
-            }
+            return;
         }
         #endregion
 
         #region JSON
         private string reqSessionControl(string model)
         {
-            //JObject msgType = new JObject(
-            //    new JProperty("MsgType", "ConnectModel")
-            //    );
             JObject msgData = new JObject(
                 new JProperty("ModelName", model)
                 );
 
             JObject jsonMsg = new JObject(
-                new JProperty("msgType", "ConnectModel"),
-                new JProperty("msgData", msgData)
+                new JProperty("MsgType", "ConnectModel"),
+                new JProperty("MsgData", msgData)
                 );
 
             return jsonMsg.ToString();
@@ -370,6 +689,24 @@ namespace T.MIC_Demo_for_WIN
 
             return result;
         }
+
+        private string jsonStreamTranscribe(string jsonString)
+        {
+            string start;
+            string end;
+            string txt;
+            string vol;
+
+            JObject jObject = JObject.Parse(jsonString);
+            start = jObject["start"].ToString();
+            end = jObject["end"].ToString();
+            txt = jObject["txt"].ToString();
+            vol = jObject["vol"].ToString();
+
+            Console.WriteLine("start : {0}, end : {1}1, txt : {2}, vol : {3}", start, end, txt, vol);
+
+            return txt;
+        }
         #endregion
 
         #region Timer
@@ -381,20 +718,32 @@ namespace T.MIC_Demo_for_WIN
         /// <param name="e"></param>
         private void statusMngTimer_Tick(object sender, EventArgs e)
         {
-            if (cbMICList.Text == "TCP/IP")
+            if (cbProtocol.Text == "TCP/IP")
             {
-                if(tcpCli.Connected == true)
+                if (tcpCli != null)
                 {
-                    Console.WriteLine("[TCP/IP] 연결");
-                    IsConnected = true;
+                    if (tcpCli.Connected == true)
+                    {
+                        //Console.WriteLine("[TCP/IP] 연결");
+                        IsConnected = true;
+                        //btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.Text = "연결됨"; }));
+                        //btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.BackColor = Color.LightGreen; }));
+                    }
+                    else
+                    {
+                        //Console.WriteLine("[TCP/IP] 연결해제");
+                        IsConnected = false;
+                        //btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.Text = "연결요청"; }));
+                        //btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.BackColor = Color.LightPink; }));
+                    }
                 }
-                else
-                {
-                    Console.WriteLine("[TCP/IP] 연결해제");
-                    IsConnected = false;
-                }
+            }
+            else
+            {
+
             }
         }
         #endregion
+
     }
 }

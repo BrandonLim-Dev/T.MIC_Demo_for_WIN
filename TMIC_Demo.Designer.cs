@@ -35,24 +35,27 @@ namespace T.MIC_Demo_for_WIN
             this.cbProtocol = new System.Windows.Forms.ComboBox();
             this.label4 = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
-            this.tbPortNumber = new System.Windows.Forms.TextBox();
             this.tbIPAddress = new System.Windows.Forms.TextBox();
             this.label2 = new System.Windows.Forms.Label();
             this.label1 = new System.Windows.Forms.Label();
             this.btnConnection = new System.Windows.Forms.Button();
             this.btnMute = new System.Windows.Forms.Button();
-            this.lvTextlist = new System.Windows.Forms.ListView();
             this.statusMngTimer = new System.Windows.Forms.Timer(this.components);
+            this.lbLog = new System.Windows.Forms.ListBox();
+            this.groupBox2 = new System.Windows.Forms.GroupBox();
+            this.lbSttText = new System.Windows.Forms.ListBox();
+            this.mtbPortNumber = new System.Windows.Forms.MaskedTextBox();
             this.groupBox1.SuspendLayout();
+            this.groupBox2.SuspendLayout();
             this.SuspendLayout();
             // 
             // groupBox1
             // 
+            this.groupBox1.Controls.Add(this.mtbPortNumber);
             this.groupBox1.Controls.Add(this.cbMICList);
             this.groupBox1.Controls.Add(this.cbProtocol);
             this.groupBox1.Controls.Add(this.label4);
             this.groupBox1.Controls.Add(this.label3);
-            this.groupBox1.Controls.Add(this.tbPortNumber);
             this.groupBox1.Controls.Add(this.tbIPAddress);
             this.groupBox1.Controls.Add(this.label2);
             this.groupBox1.Controls.Add(this.label1);
@@ -66,8 +69,6 @@ namespace T.MIC_Demo_for_WIN
             // cbMICList
             // 
             this.cbMICList.FormattingEnabled = true;
-            this.cbMICList.Items.AddRange(new object[] {
-            "선택해주세요"});
             this.cbMICList.Location = new System.Drawing.Point(281, 47);
             this.cbMICList.Name = "cbMICList";
             this.cbMICList.Size = new System.Drawing.Size(139, 20);
@@ -102,19 +103,14 @@ namespace T.MIC_Demo_for_WIN
             this.label3.TabIndex = 4;
             this.label3.Text = "Protocol";
             // 
-            // tbPortNumber
-            // 
-            this.tbPortNumber.Location = new System.Drawing.Point(71, 47);
-            this.tbPortNumber.Name = "tbPortNumber";
-            this.tbPortNumber.Size = new System.Drawing.Size(128, 21);
-            this.tbPortNumber.TabIndex = 3;
-            // 
             // tbIPAddress
             // 
             this.tbIPAddress.Location = new System.Drawing.Point(71, 20);
+            this.tbIPAddress.MaxLength = 15;
             this.tbIPAddress.Name = "tbIPAddress";
             this.tbIPAddress.Size = new System.Drawing.Size(128, 21);
             this.tbIPAddress.TabIndex = 2;
+            this.tbIPAddress.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.tbIPAddress_KeyPress);
             // 
             // label2
             // 
@@ -136,7 +132,7 @@ namespace T.MIC_Demo_for_WIN
             // 
             // btnConnection
             // 
-            this.btnConnection.BackColor = System.Drawing.SystemColors.Control;
+            this.btnConnection.BackColor = System.Drawing.Color.LightPink;
             this.btnConnection.Location = new System.Drawing.Point(450, 17);
             this.btnConnection.Name = "btnConnection";
             this.btnConnection.Size = new System.Drawing.Size(120, 77);
@@ -147,7 +143,7 @@ namespace T.MIC_Demo_for_WIN
             // 
             // btnMute
             // 
-            this.btnMute.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(192)))));
+            this.btnMute.BackColor = System.Drawing.Color.LightPink;
             this.btnMute.Location = new System.Drawing.Point(576, 17);
             this.btnMute.Name = "btnMute";
             this.btnMute.Size = new System.Drawing.Size(120, 77);
@@ -156,36 +152,67 @@ namespace T.MIC_Demo_for_WIN
             this.btnMute.UseVisualStyleBackColor = false;
             this.btnMute.Click += new System.EventHandler(this.btnMute_Click);
             // 
-            // lvTextlist
-            // 
-            this.lvTextlist.HideSelection = false;
-            this.lvTextlist.Location = new System.Drawing.Point(12, 100);
-            this.lvTextlist.Name = "lvTextlist";
-            this.lvTextlist.Size = new System.Drawing.Size(684, 334);
-            this.lvTextlist.TabIndex = 3;
-            this.lvTextlist.UseCompatibleStateImageBehavior = false;
-            // 
             // statusMngTimer
             // 
             this.statusMngTimer.Enabled = true;
-            this.statusMngTimer.Interval = 1000;
             this.statusMngTimer.Tick += new System.EventHandler(this.statusMngTimer_Tick);
+            // 
+            // lbLog
+            // 
+            this.lbLog.FormattingEnabled = true;
+            this.lbLog.HorizontalScrollbar = true;
+            this.lbLog.ItemHeight = 12;
+            this.lbLog.Location = new System.Drawing.Point(12, 420);
+            this.lbLog.Name = "lbLog";
+            this.lbLog.Size = new System.Drawing.Size(682, 124);
+            this.lbLog.TabIndex = 4;
+            // 
+            // groupBox2
+            // 
+            this.groupBox2.Controls.Add(this.lbSttText);
+            this.groupBox2.Location = new System.Drawing.Point(12, 100);
+            this.groupBox2.Name = "groupBox2";
+            this.groupBox2.Size = new System.Drawing.Size(682, 314);
+            this.groupBox2.TabIndex = 5;
+            this.groupBox2.TabStop = false;
+            this.groupBox2.Text = "STT 변환 결과";
+            // 
+            // lbSttText
+            // 
+            this.lbSttText.FormattingEnabled = true;
+            this.lbSttText.HorizontalScrollbar = true;
+            this.lbSttText.ItemHeight = 12;
+            this.lbSttText.Location = new System.Drawing.Point(8, 20);
+            this.lbSttText.Name = "lbSttText";
+            this.lbSttText.Size = new System.Drawing.Size(668, 280);
+            this.lbSttText.TabIndex = 4;
+            // 
+            // mtbPortNumber
+            // 
+            this.mtbPortNumber.Location = new System.Drawing.Point(71, 46);
+            this.mtbPortNumber.Mask = "99999";
+            this.mtbPortNumber.Name = "mtbPortNumber";
+            this.mtbPortNumber.Size = new System.Drawing.Size(128, 21);
+            this.mtbPortNumber.TabIndex = 6;
+            this.mtbPortNumber.ValidatingType = typeof(int);
             // 
             // TMIC_Demo
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(706, 449);
-            this.Controls.Add(this.lvTextlist);
+            this.ClientSize = new System.Drawing.Size(707, 556);
+            this.Controls.Add(this.groupBox2);
+            this.Controls.Add(this.lbLog);
             this.Controls.Add(this.btnMute);
             this.Controls.Add(this.btnConnection);
             this.Controls.Add(this.groupBox1);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Name = "TMIC_Demo";
-            this.Text = "T.MIC Demo";
+            this.Text = "T.MIC Demo v0.9";
             this.Load += new System.EventHandler(this.TMIC_Demo_Load);
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
+            this.groupBox2.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
@@ -197,14 +224,16 @@ namespace T.MIC_Demo_for_WIN
         private System.Windows.Forms.ComboBox cbProtocol;
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.Label label3;
-        private System.Windows.Forms.TextBox tbPortNumber;
         private System.Windows.Forms.TextBox tbIPAddress;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Button btnConnection;
         private System.Windows.Forms.Button btnMute;
-        private System.Windows.Forms.ListView lvTextlist;
         private System.Windows.Forms.Timer statusMngTimer;
+        private System.Windows.Forms.ListBox lbLog;
+        private System.Windows.Forms.GroupBox groupBox2;
+        private System.Windows.Forms.ListBox lbSttText;
+        private System.Windows.Forms.MaskedTextBox mtbPortNumber;
     }
 }
 
