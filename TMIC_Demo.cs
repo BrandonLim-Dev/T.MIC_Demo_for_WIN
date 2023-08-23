@@ -70,8 +70,6 @@ namespace T.MIC_Demo_for_WIN
         public TMIC_Demo()
         {
             InitializeComponent();
-            // TCP/IP
-            //initTaskThread();
         }
 
         #region Property
@@ -94,6 +92,9 @@ namespace T.MIC_Demo_for_WIN
             Directory.CreateDirectory(outputFolder);
             outputFilePath = Path.Combine(outputFolder, "recorded.wav");
 
+            lbLog.HorizontalScrollbar = true;
+            lbSttText.HorizontalScrollbar = true;
+            
             // Socket Thread
             //tcpCli = new TcpClient();
             //Thread tcpReceiveThread = new Thread(new ThreadStart(tcpReceive));
@@ -231,6 +232,7 @@ namespace T.MIC_Demo_for_WIN
                 seq = -1;
                 btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.Text = "연결요청"; }));
                 btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.BackColor = Color.LightPink; }));
+                IsMute = true;
                 btnMute.Invoke(new MethodInvoker(delegate { btnMute.Text = "마이크 꺼짐"; }));
                 btnMute.Invoke(new MethodInvoker(delegate { btnMute.BackColor = Color.LightPink; }));
                 tbIPAddress.Invoke(new MethodInvoker(delegate { tbIPAddress.ReadOnly = false; }));
@@ -290,8 +292,20 @@ namespace T.MIC_Demo_for_WIN
             }
             else // IsConnected = true
             {
-                Console.WriteLine("마이크 ON/OFF 기능은 아직 지원하지 않습니다.");
-                MessageBox.Show("마이크 ON/OFF 기능은 아직 지원하지 않습니다.", "안내", MessageBoxButtons.OK, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1, MessageBoxOptions.DefaultDesktopOnly);
+                if (IsMute == true) // 마이크 꺼짐
+                {
+                    IsMute = false;
+                    btnMute.Invoke(new MethodInvoker(delegate { btnMute.Text = "마이크 켜짐"; }));
+                    btnMute.Invoke(new MethodInvoker(delegate { btnMute.BackColor = Color.LightGreen; }));
+                    Console.WriteLine("UNMUTE");
+                }
+                else // IsMute == false 마이크 켜짐
+                {
+                    IsMute = true;
+                    btnMute.Invoke(new MethodInvoker(delegate { btnMute.Text = "마이크 꺼짐"; }));
+                    btnMute.Invoke(new MethodInvoker(delegate { btnMute.BackColor = Color.LightPink; }));
+                    Console.WriteLine("MUTE");
+                }
             }
         }
         #endregion
@@ -351,11 +365,6 @@ namespace T.MIC_Demo_for_WIN
                     Console.WriteLine("[TCP Recv]\n {0}", message);
 
                     // 1. GET Header
-                    //byte[] buffer = new byte[8];
-                    //int bytes = stream.Read(buffer, 0, buffer.Length);
-                    //if (bytes <= 0)
-                    //    continue;
-
                     byte[] buffer = new byte[8];
                     Array.Copy(rBuffer, buffer, buffer.Length);
                     Console.WriteLine(BitConverter.ToString(buffer));
@@ -389,8 +398,14 @@ namespace T.MIC_Demo_for_WIN
                     Array.Copy(rBuffer, 8, buffer, 0, buffer.Length);
                     message = Encoding.UTF8.GetString(buffer, 0, PayloadLength);
                     Console.WriteLine("[TCP Recv - Body]\n {0}", message);
-                    lbLog.Invoke(new MethodInvoker(delegate { lbLog.Items.Add("rcvMsg(" + PayloadLength + ") : " + message); }));
-                    lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
+                    lbLog.Invoke(new MethodInvoker(delegate {
+                        //lbLog.IntegralHeight = true;
+                        lbLog.Items.Add("rcvMsg(" + PayloadLength + ") : " + message);
+                        //int hzSize = (int)g.MeasureString(lbLog.Items[lbLog.Items.Count - 1].ToString(), lbLog.Font).Width;
+                        //Console.WriteLine("text size : " + hzSize);
+                        //lbLog.HorizontalExtent = hzSize + 50;
+                        lbLog.SelectedIndex = lbLog.Items.Count - 1;
+                    }));
 
                     if (MsgCode.Equals("01"))
                     {
@@ -408,16 +423,12 @@ namespace T.MIC_Demo_for_WIN
                             lbLog.Invoke(new MethodInvoker(delegate { lbLog.SelectedIndex = lbLog.Items.Count - 1; }));
                             btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.Text = "연결됨"; }));
                             btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.BackColor = Color.LightGreen; }));
-                            btnMute.Invoke(new MethodInvoker(delegate { btnMute.Text = "마이크 켜짐"; }));
-                            btnMute.Invoke(new MethodInvoker(delegate { btnMute.BackColor = Color.LightGreen; }));
-
                             tbIPAddress.Invoke(new MethodInvoker(delegate { tbIPAddress.ReadOnly = true; }));
                             mtbPortNumber.Invoke(new MethodInvoker(delegate { mtbPortNumber.ReadOnly = true; }));
                             cbMICList.Invoke(new MethodInvoker(delegate { cbMICList.Enabled = false; }));
                             cbProtocol.Invoke(new MethodInvoker(delegate { cbProtocol.Enabled = false; }));
 
                             // Voice from MIC Device Capture Start
-                            //asyncTimer.Change(0, 50);
                             initWaveIn();
                             waveIn.StartRecording();
                             writer = new WaveFileWriter(outputFilePath, waveIn.WaveFormat);
@@ -457,6 +468,7 @@ namespace T.MIC_Demo_for_WIN
                     seq = -1;
                     btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.Text = "연결요청"; }));
                     btnConnection.Invoke(new MethodInvoker(delegate { btnConnection.BackColor = Color.LightPink; }));
+                    IsMute = true;
                     btnMute.Invoke(new MethodInvoker(delegate { btnMute.Text = "마이크 꺼짐"; }));
                     btnMute.Invoke(new MethodInvoker(delegate { btnMute.BackColor = Color.LightPink; }));
                     tbIPAddress.Invoke(new MethodInvoker(delegate { tbIPAddress.ReadOnly = false; }));
@@ -534,49 +546,6 @@ namespace T.MIC_Demo_for_WIN
         #endregion
 
         #region Inner Function
-        //public void initTaskThread()
-        //{
-        //    asyncTimer = new System.Threading.Timer(asyncRun, "tcpAsync", 0, System.Threading.Timeout.Infinite);
-        //}
-        //
-        //public async void asyncRun(object obj)
-        //{
-        //    var objTask = Task.Run(() => SendTcpSocketAsync());
-        //    await objTask;
-        //}
-        //
-        //private void SendTcpSocketAsync()
-        //{
-        //    try
-        //    {
-        //        if(IsConnected == true)
-        //        {
-        //            if (micByte.Length == 3200)
-        //            {
-        //                NetworkStream tcpStream = tcpCli.GetStream();
-        //                //byte[] sendBuf = new byte[2048];
-        //                //Array.Copy(micByte, 0, sendBuf, 0, 2048);
-        //                //micByte = splitByteArray(micByte, 2048, micByte.Length - 2048);
-        //
-        //                // TCP/IP Header
-        //                byte[] version = { 0x00 };
-        //                byte[] msgcode = { 0x02 }; // 0x01 : SessionControl, 0x02 : SessionTranscribe
-        //                seq = seq + 1;
-        //                Byte[] header = makeTcpHeader(version, msgcode, seq, micByte.Length);
-        //                //Console.WriteLine("seq : {0}, micByte.Length : {1}", seq, micByte.Length);
-        //                
-        //                tcpStream.Write(header, 0, header.Length);
-        //                // TCP/IP Body
-        //                tcpStream.Write(micByte, 0, micByte.Length);
-        //            }
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.WriteLine(ex.ToString());
-        //    }
-        //}
-
         private void SelectMICList()
         {
             try
@@ -620,11 +589,18 @@ namespace T.MIC_Demo_for_WIN
 
                     tcpStream.Write(header, 0, header.Length);
                     // TCP/IP Body
-                    tcpStream.Write(a.Buffer, 0, a.BytesRecorded);
+                    if (IsMute == false)
+                    {
+                        tcpStream.Write(a.Buffer, 0, a.BytesRecorded);
+                    }
+                    else
+                    {
+                        byte[] muteByte = new byte[a.BytesRecorded];
+                        Array.Clear(muteByte, 0x00, muteByte.Length);
+                        tcpStream.Write(muteByte, 0, muteByte.Length);
+                    }
                 }
             }
-            //micByte = new byte[a.BytesRecorded];
-            //Array.Copy(a.Buffer, 0, micByte, 0, a.BytesRecorded);
         }
 
         private void initWaveIn()
