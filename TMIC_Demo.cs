@@ -452,8 +452,14 @@ namespace T.MIC_Demo_for_WIN
                         //    "txt" : "안녕하세요",
                         //    "vol" : "1049"
                         //}
-                        string result = jsonStreamTranscribe(message);
-                        lbSttText.Invoke(new MethodInvoker(delegate { lbSttText.Items.Add(result); }));
+                        // <!-- 20230823 v1.1 STT 변환 결과 표시 수정 --!>
+                        (string start, string end, string result) = jsonStreamTranscribe(message);
+
+                        string startTime = ConvertMilisecondsToTime(start);
+                        string endTime = ConvertMilisecondsToTime(end);
+                        string sttText = "[" + startTime + "-" + endTime + "]  " + result;
+
+                        lbSttText.Invoke(new MethodInvoker(delegate { lbSttText.Items.Add(sttText); }));
                         lbSttText.Invoke(new MethodInvoker(delegate { lbSttText.SelectedIndex = lbSttText.Items.Count - 1; }));
                     }
                 }
@@ -636,6 +642,16 @@ namespace T.MIC_Demo_for_WIN
             }
             return;
         }
+
+        private string ConvertMilisecondsToTime(string milisec)
+        {
+            long tick = long.Parse(milisec);
+            TimeSpan timeSpan = TimeSpan.FromMilliseconds(tick);
+            string Time = string.Format("{0:D2}:{1:D2}:{2:D2}.{3:D3}",
+                timeSpan.Hours, timeSpan.Minutes, timeSpan.Seconds, timeSpan.Milliseconds);
+
+            return Time;
+        }
         #endregion
 
         #region JSON
@@ -666,7 +682,8 @@ namespace T.MIC_Demo_for_WIN
             return result;
         }
 
-        private string jsonStreamTranscribe(string jsonString)
+        // <!-- 20230823 v1.1 STT 변환 결과 표시 수정 --!>
+        private static (string, string, string) jsonStreamTranscribe(string jsonString)
         {
             string start;
             string end;
@@ -681,7 +698,8 @@ namespace T.MIC_Demo_for_WIN
 
             Console.WriteLine("start : {0}, end : {1}1, txt : {2}, vol : {3}", start, end, txt, vol);
 
-            return txt;
+            // <!-- 20230823 v1.1 STT 변환 결과 표시 수정 --!>
+            return (start, end, txt);
         }
         #endregion
 
