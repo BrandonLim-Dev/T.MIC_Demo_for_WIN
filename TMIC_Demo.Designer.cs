@@ -207,7 +207,7 @@ namespace T.MIC_Demo_for_WIN
             this.Controls.Add(this.groupBox1);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Name = "TMIC_Demo";
-            this.Text = "T.MIC Demo v1.0";
+            this.Text = "T.MIC Demo v1.２";
             this.Load += new System.EventHandler(this.TMIC_Demo_Load);
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();

@@ -315,11 +315,25 @@ namespace T.MIC_Demo_for_WIN
         {
             Int16 Seq = Convert.ToInt16(seq);
             byte[] sequence = BitConverter.GetBytes(Seq);
+            // <!-- 20230825 v1.2  TCP/IP 네트워크 Endian 수정 --!>
+            if(BitConverter.IsLittleEndian)
+                Array.Reverse(sequence);
             byte[] payloadlength = BitConverter.GetBytes(length);
+            // <!-- 20230825 v1.2  TCP/IP 네트워크 Endian 수정 --!>
+            if (BitConverter.IsLittleEndian)
+                Array.Reverse(payloadlength);
 
             Byte[] result = ver.Concat(msgCode).Concat(sequence).Concat(payloadlength).ToArray();
 
             return result;
+        }
+
+        private byte[] EndianConvert(byte[] byteArray)
+        {
+            byte[] arr = new byte[byteArray.Length];
+            Array.Reverse(byteArray);
+
+            return byteArray;
         }
 
         private void tcpConnect()
@@ -369,7 +383,7 @@ namespace T.MIC_Demo_for_WIN
                     Array.Copy(rBuffer, buffer, buffer.Length);
                     Console.WriteLine(BitConverter.ToString(buffer));
 
-                    // 1-1. version (1byte)
+                    // 1-1. Version (1byte)
                     byte[] tmpVersion = new byte[1];
                     Buffer.BlockCopy(buffer, 0, tmpVersion, 0, 1);
                     string Version = BitConverter.ToString(tmpVersion);
@@ -382,11 +396,17 @@ namespace T.MIC_Demo_for_WIN
                     // 1-3. Sequence (2byte)
                     byte[] tmpSeq = new byte[2];
                     Buffer.BlockCopy(buffer, 2, tmpSeq, 0, 2);
+                    // <!-- 20230825 v1.2  TCP/IP 네트워크 Endian 수정 --!>
+                    if (BitConverter.IsLittleEndian)
+                        Array.Reverse(tmpSeq);
                     short Sequence = BitConverter.ToInt16(tmpSeq, 0);
                     Console.WriteLine("Sequence : {0}", Sequence);
                     // 1-4. PayloadLength (4byte)
                     byte[] tmpLength = new byte[4];
                     Buffer.BlockCopy(buffer, 4, tmpLength, 0, 4);
+                    // <!-- 20230825 v1.2  TCP/IP 네트워크 Endian 수정 --!>
+                    if (BitConverter.IsLittleEndian)
+                        Array.Reverse(tmpLength);
                     int PayloadLength = BitConverter.ToInt32(tmpLength, 0);
                     Console.WriteLine("PayloadLength : {0}", PayloadLength);
 
